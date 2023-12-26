@@ -8,7 +8,11 @@ package suwayomi.tachidesk.manga.controller
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import io.javalin.http.HttpCode
+import io.javalin.http.NotFoundResponse
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.kodein.di.DI
 import org.kodein.di.conf.global
 import org.kodein.di.instance
@@ -18,15 +22,18 @@ import suwayomi.tachidesk.manga.impl.Library
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.Page
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyByIndex
+import suwayomi.tachidesk.manga.impl.util.getChapterCbzPath
 import suwayomi.tachidesk.manga.model.dataclass.CategoryDataClass
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
 import suwayomi.tachidesk.manga.model.dataclass.MangaDataClass
+import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.util.formParam
 import suwayomi.tachidesk.server.util.handler
 import suwayomi.tachidesk.server.util.pathParam
 import suwayomi.tachidesk.server.util.queryParam
 import suwayomi.tachidesk.server.util.withOperation
+import java.io.File
 import kotlin.time.Duration.Companion.days
 
 object MangaController {
@@ -313,6 +320,46 @@ object MangaController {
             },
             withResults = {
                 json<ChapterDataClass>(HttpCode.OK)
+                httpCode(HttpCode.NOT_FOUND)
+            },
+        )
+
+    val chapterDownloadCbz =
+        handler(
+            pathParam<Int>("mangaId"),
+            pathParam<Int>("chapterIndex"),
+            documentWith = {
+                withOperation {
+                    summary("Download a chapter's cbz")
+                    description("Download the chapter as a cbz file, if it exists.")
+                }
+            },
+            behaviorOf = { ctx, mangaId, chapterIndex ->
+                ctx.future(
+                    future {
+                        val chapterId =
+                            transaction {
+                                ChapterTable.select {
+                                    (ChapterTable.sourceOrder eq chapterIndex) and (ChapterTable.manga eq mangaId)
+                                }.map { row -> row[ChapterTable.id].value }.first()
+                            }
+                        val cbzFile = File(getChapterCbzPath(mangaId, chapterId))
+                        if (!cbzFile.exists()) {
+                            throw NotFoundResponse("cbz not downloaded")
+                        }
+
+                        val fileName = cbzFile.toString().substringAfterLast("/")
+                        ctx.contentType("application/octet-stream")
+                        ctx.header(
+                            "Content-Disposition",
+                            """attachment; filename="$fileName"""",
+                        )
+                        cbzFile.inputStream()
+                    },
+                )
+            },
+            withResults = {
+                stream(HttpCode.OK)
                 httpCode(HttpCode.NOT_FOUND)
             },
         )

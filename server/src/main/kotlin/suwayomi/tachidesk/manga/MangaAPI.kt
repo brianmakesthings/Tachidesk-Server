@@ -70,6 +70,7 @@ object MangaAPI {
             get("{mangaId}/chapters", MangaController.chapterList)
             post("{mangaId}/chapter/batch", MangaController.chapterBatch)
             get("{mangaId}/chapter/{chapterIndex}", MangaController.chapterRetrieve)
+            get("{mangaId}/chapter/{chapterIndex}/download_cbz", MangaController.chapterDownloadCbz)
             patch("{mangaId}/chapter/{chapterIndex}", MangaController.chapterModify)
             put("{mangaId}/chapter/{chapterIndex}", MangaController.chapterModify)
             delete("{mangaId}/chapter/{chapterIndex}", MangaController.chapterDelete)

@@ -31,7 +31,7 @@ private fun getMangaDir(mangaId: Int): String {
     return "$sourceDir/$mangaDir"
 }
 
-private fun getChapterDir(
+fun getChapterDir(
     mangaId: Int,
     chapterId: Int,
 ): String {
